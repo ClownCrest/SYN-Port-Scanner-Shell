@@ -6,6 +6,7 @@ from scapy.all import *
 from netaddr import IPNetwork, IPRange, AddrFormatError
 
 def is_valid_ip(ip):
+    """Check if the provided IP is a valid IPv4 address."""
     try:
         socket.inet_aton(ip)
         return True
@@ -34,26 +35,29 @@ def get_local_subnet():
 def is_host_online(target):
     if target.startswith("127."):
         return True
-    ans, _ = arping(target, timeout=1, verbose=False)
-    return len(ans) > 0
+    try:
+        ans, _ = arping(target, timeout=1, verbose=False)
+        return len(ans) > 0
+    except Exception:
+        return False
 
 def syn_scan(target, port):
-    iface = "lo" if target.startswith("127.") else None
-    print(f"[*] Scanning {target}:{port} using {iface or 'default interface'}...")
-
-    pkt = IP(dst=target) / TCP(dport=port, flags="S", sport=RandShort())
-    ans, _ = sr(pkt, iface=iface, timeout=2, verbose=False)
-
-    if ans:
-        for sent, received in ans:
-            if received.haslayer(TCP):
-                tcp_layer = received.getlayer(TCP)
-
-                if tcp_layer.flags == 0x12:
-                    send(IP(dst=target) / TCP(dport=port, flags="R"), iface=iface, verbose=False)
-                    return "open"
-                elif tcp_layer.flags == 0x14:
-                    return "closed"
+    ip_packet = IP(dst=target)
+    tcp_packet = TCP(dport=port, flags="S", sport=RandShort())
+    packet = ip_packet / tcp_packet
+    response = sr1(packet, timeout=1, verbose=False)
+    
+    if response:
+        if response.haslayer(TCP):
+            if response.getlayer(TCP).flags == 0x12:  # SYN-ACK received
+                print(f"[+] {target}:{port} is OPEN")
+                return "open"
+            elif response.getlayer(TCP).flags == 0x14:  # RST-ACK received
+                print(f"[-] {target}:{port} is CLOSED")
+                return "closed"
+        print(f"[?] {target}:{port} is FILTERED")
+        return "filtered"
+    print(f"[?] {target}:{port} is FILTERED")
     return "filtered"
 
 def scan_target(target, ports, open_hosts, closed_hosts, filtered_hosts):
@@ -62,16 +66,14 @@ def scan_target(target, ports, open_hosts, closed_hosts, filtered_hosts):
         print(f"[-] {target} is unreachable. Skipping...")
         return
     for port in ports:
+        print(f"[*] Scanning {target}:{port}...")
         result = syn_scan(target, port)
         if result == "open":
             open_hosts.append((target, port))
-            print(f"[+] {target}:{port} is OPEN.")
         elif result == "closed":
             closed_hosts.append((target, port))
-            print(f"[-] {target}:{port} is CLOSED.")
         elif result == "filtered":
             filtered_hosts.append((target, port))
-            print(f"[?] {target}:{port} is FILTERED (No response).")
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="SYN Scanner Shell for Students")
@@ -79,8 +81,10 @@ def parse_arguments():
     parser.add_argument("-p", "--ports", help="Port(s) to scan (e.g., 80,443,1-100)")
     parser.add_argument("--show", help="Filter results: open, closed, filtered")
     args = parser.parse_args()
+    
     if not args.target:
         args.target = get_local_subnet()
+    
     targets = []
     try:
         if "/" in args.target:
@@ -97,22 +101,18 @@ def parse_arguments():
     except (AddrFormatError, ValueError) as e:
         print(f"[!] Error parsing target IP: {e}")
         exit(1)
+    
     ports = []
     if args.ports:
         try:
             parts = args.ports.split(",")
             for part in parts:
                 if "-" in part:
-                    start, end = part.split("-")
-                    if not start.isdigit() or not end.isdigit():
-                        raise ValueError("Ports must be numeric.")
-                    start, end = int(start), int(end)
+                    start, end = map(int, part.split("-"))
                     if start < 1 or end > 65535:
                         raise ValueError("Port numbers must be between 1 and 65535.")
                     ports.extend(range(start, end + 1))
                 else:
-                    if not part.isdigit():
-                        raise ValueError("Ports must be numeric.")
                     port = int(part)
                     if port < 1 or port > 65535:
                         raise ValueError("Port numbers must be between 1 and 65535.")
@@ -122,31 +122,15 @@ def parse_arguments():
             exit(1)
     else:
         ports = list(range(1, 65536))
+    
     return targets, ports, args.show
 
 if __name__ == "__main__":
     targets, ports, show_filter = parse_arguments()
-    open_hosts = []
-    closed_hosts = []
-    filtered_hosts = []
+    open_hosts, closed_hosts, filtered_hosts = [], [], []
+    
     print("\n[+] Starting scan...")
     for target in targets:
         scan_target(target, ports, open_hosts, closed_hosts, filtered_hosts)
-    print("\n[+] Scan Summary:")
-    if show_filter:
-        show_filter = show_filter.lower()
-        if show_filter == "open":
-            print(f"  Open Ports: {open_hosts}")
-        elif show_filter == "closed":
-            print(f"  Closed Ports: {closed_hosts}")
-        elif show_filter == "filtered":
-            print(f"  Filtered Ports: {filtered_hosts}")
-        else:
-            print("  Invalid filter option provided. Showing all results:")
-            print(f"  Open Ports: {open_hosts}")
-            print(f"  Closed Ports: {closed_hosts}")
-            print(f"  Filtered Ports: {filtered_hosts}")
-    else:
-        print(f"  Open Ports: {open_hosts}")
-        print(f"  Closed Ports: {closed_hosts}")
-        print(f"  Filtered Ports: {filtered_hosts}")
+    
+    print("\n[+] Scan Complete")
