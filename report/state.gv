@@ -1,0 +1,52 @@
+digraph syn_scanner {
+    rankdir="TB";
+    node [shape=rectangle, style=filled, fillcolor=lightblue];
+    graph [nodesep=0.5, ranksep=0.5];
+
+    // Main components
+    main [label="__main__\n(Entry Point)"];
+    parse_arguments [label="parse_arguments()"];
+    scan_target [label="scan_target()"];
+    is_valid_ip [label="is_valid_ip()"];
+    get_local_subnet [label="get_local_subnet()"];
+    is_host_online [label="is_host_online()"];
+    syn_scan [label="syn_scan()"];
+    format_results [label="format_results()"];
+    print_section [label="print_section()"];
+
+    // External modules
+    node [shape=ellipse, fillcolor=lightyellow];
+    argparse; socket; subprocess; re; scapy; netaddr;
+
+    // Relationships
+    main -> parse_arguments
+    main -> scan_target
+    main -> format_results
+    main -> print_section
+    
+    parse_arguments -> get_local_subnet
+    parse_arguments -> is_valid_ip
+    parse_arguments -> argparse
+    parse_arguments -> netaddr [label="IPNetwork\nIPRange\nAddrFormatError"]
+    
+    scan_target -> is_host_online
+    scan_target -> syn_scan
+    scan_target -> socket [label="gethostbyname"]
+    
+    get_local_subnet -> subprocess [label="ip route"]
+    get_local_subnet -> re [label="regex parsing"]
+    get_local_subnet -> socket [label="fallback IP"]
+    
+    is_host_online -> scapy [label="arping"]
+    
+    syn_scan -> scapy [label="IP/TCP\nsr1/send"]
+    
+    is_valid_ip -> socket [label="inet_aton"]
+    
+    format_results -> print_section [style=dashed]
+
+    // Rank grouping
+    { rank=same; main; parse_arguments; scan_target }
+    { rank=same; is_valid_ip; get_local_subnet; is_host_online; syn_scan }
+    { rank=same; argparse; socket; subprocess; re; scapy; netaddr }
+}
