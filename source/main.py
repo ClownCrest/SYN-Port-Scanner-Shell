@@ -39,10 +39,23 @@ def is_host_online(target):
     return len(ans) > 0
 
 def syn_scan(target, port):
+    if target == "127.0.0.1":
+        # Use connect scan for localhost
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        try:
+            sock.connect((target, port))
+            sock.close()
+            return "open"
+        except (socket.timeout, ConnectionRefusedError):
+            return "closed"
+    
+    # Regular SYN scan for external targets
     ip_packet = IP(dst=target)
     tcp_packet = TCP(dport=port, flags="S", sport=RandShort())
     packet = ip_packet / tcp_packet
     response = sr1(packet, timeout=1, verbose=False)
+
     if response is None:
         return "filtered"
     elif response.haslayer(TCP):
@@ -53,7 +66,9 @@ def syn_scan(target, port):
             return "open"
         elif tcp_layer.flags == 0x14:
             return "closed"
+    
     return "filtered"
+
 
 def scan_target(target, ports, open_hosts, closed_hosts, filtered_hosts):
     print(f"\n[+] Scanning {target} on ports {min(ports)}-{max(ports)}...")
