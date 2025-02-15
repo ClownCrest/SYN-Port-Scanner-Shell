@@ -1,0 +1,4 @@
+also PORT     STATE SERVICE
+22/tcp   open  ssh
+631/tcp  open  ipp
+7070/tcp open  realserver
