@@ -33,6 +33,10 @@ def get_local_subnet():
         return "192.168.0.0/24"
 
 def is_host_online(target):
+    """
+    Uses ARP to check if a target is online.
+    Loopback addresses (127.x.x.x) are always considered reachable.
+    """
     if target.startswith("127."):
         return True
     ans, _ = arping(target, timeout=1, verbose=False)
