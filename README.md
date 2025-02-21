@@ -1,4 +1,4 @@
-# SYN Scanner Shell
+# SYN Port Scanner Shell
 
 ## Overview
 This Python script is a SYN scanner designed for network security students. It allows users to scan a target IP, IP range, or subnet for open, closed, and filtered ports. The scanner supports I/O multiplexing and leverages ARP requests and SYN packets to determine port states.
