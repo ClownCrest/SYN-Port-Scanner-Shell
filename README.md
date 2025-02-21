@@ -62,6 +62,3 @@ python syn_scanner.py -t 192.168.1.1 -p 1-100 --show open
 ## Disclaimer
 This tool is intended for educational and authorized security testing purposes only. Unauthorized scanning of networks may be illegal in some jurisdictions.
 
-## License
-This project is open-source under the MIT License.
-
